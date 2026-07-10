@@ -2682,40 +2682,69 @@ async def shadow(ctx, member: discord.Member):
 
 @bot.command()
 @check_perms("testerkey", administrator=True)
-async def testerkey(ctx, action: str = "start"):
-    tester_data = load_json(TESTER_KEYS_FILE, list)
-
-    if action.lower() in ["stop", "end", "cancel"]:
-        if ctx.channel.id in active_tester_tasks:
-            active_tester_tasks[ctx.channel.id].cancel()
-            del active_tester_tasks[ctx.channel.id]
-        if ctx.channel.id in tester_data:
-            tester_data.remove(ctx.channel.id)
-            save_json(TESTER_KEYS_FILE, tester_data)
-        
-        msg = await ctx.send("Tester key loop stopped in this channel.")
-        await msg.delete(delay=5)
-        try: await ctx.message.delete()
-        except: pass
-        return
-
-    # If it is already running in this channel, stop it before restarting
-    if ctx.channel.id in active_tester_tasks:
-        active_tester_tasks[ctx.channel.id].cancel()
-        
-    # Save the channel ID to memory so it resumes if the bot resets
-    if ctx.channel.id not in tester_data:
-        tester_data.append(ctx.channel.id)
-        save_json(TESTER_KEYS_FILE, tester_data)
-
-    # Start the loop
-    task = bot.loop.create_task(tester_key_loop(ctx.channel))
-    active_tester_tasks[ctx.channel.id] = task
+async def tester_key_loop(ctx):
+    current_message = None
+    current_key = None
     
-    try:
-        await ctx.message.delete()
-    except discord.Forbidden:
-        pass
+    while True:
+        try:
+            # 1. Delete previous key from database to keep table clean
+            if current_key:
+                await supabase_request("DELETE", f"keys?key_value=eq.{current_key}")
+            
+            # 2. Generate new unique tester key
+            random_part = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=6))
+            current_key = f"SEDSE-TEST-{random_part}"
+            
+            expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+            expires_str = expires_at.isoformat()
+            epoch_time = int(expires_at.timestamp())
+            
+            # 3. Save to Supabase (sets HWID to BYPASS to ignore any checks)
+            data = {
+                "key_value": current_key,
+                "is_active": True,
+                "expires_at": expires_str,
+                "hwid": "BYPASS"
+            }
+            await supabase_request("POST", "keys", data)
+            
+            # 4. Compile the full, secure HWID-compliant loader
+            loader_code = (
+                f"local key = \"{current_key}\"\n"
+                f"local hwid = game:GetService(\"RbxAnalyticsService\"):GetClientId()\n"
+                f"(loadstring or load)(game:HttpGet(\"https://keyxyz-sedse.pages.dev/v1/load?key=\" .. "
+                f"game:GetService(\"HttpService\"):UrlEncode(key) .. \"&hwid=\" .. "
+                f"game:GetService(\"HttpService\"):UrlEncode(hwid), true))()"
+  )
+            
+            # 5. Construct the Neubrutalist Embed Menu
+            embed = discord.Embed(
+                title="🧪 Public Tester Script",
+                description=f"Copy the compiled code block below to execute the tester script directly. This key automatically bypasses all HWID and IP limits.\n\n"
+                            f"```lua\n{loader_code}\n```\n\n"
+                            f"⏳ **Expires:** <t:{epoch_time}:R>",
+                color=0x5aabf2
+            )
+            embed.set_footer(text="A new tester key will automatically generate and update inside the loader when this one expires.")
+            
+            # 6. Send or Edit Message
+            if current_message is None:
+                current_message = await ctx.send(embed=embed)
+            else:
+                await current_message.edit(embed=embed)
+                
+            # 7. Sleep for exactly 10 minutes (600 seconds)
+            await asyncio.sleep(600)
+            
+        except asyncio.CancelledError:
+            # Clean up key on cancellation
+            if current_key:
+                await supabase_request("DELETE", f"keys?key_value=eq.{current_key}")
+            break
+        except Exception as e:
+            print(f"tester key loop error: {e}")
+            await asyncio.sleep(10) # Safely retry after 10s if database rate-limits
 
 @bot.command()
 @check_perms("givequota", administrator=True)
