@@ -1,0 +1,9 @@
+discord.py[voice]
+yt-dlp
+PyNaCl
+aiohttp
+davey
+imageio-ffmpeg
+wavelink
+gTTS
+playwright==1.61.0
