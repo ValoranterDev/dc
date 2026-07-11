@@ -2781,7 +2781,7 @@ async def deobf(ctx):
         # 4. Run the Lua dumper script using Lune via command line
         # The command is: ./lune run dumper.lua <input_file> <output_file>
         process = await asyncio.create_subprocess_exec(
-            "./lune", "run", "revea.lol_dumped.lua.txt", input_filename, output_filename,
+            "./lune", "run", "dumper.lua", input_filename, output_filename,
             stdout=subprocess.PIPE, 
             stderr=subprocess.PIPE
         )
