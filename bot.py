@@ -1111,23 +1111,36 @@ def check_perms(cmd_name, **default_perms):
         raise commands.MissingPermissions([f"custom role/user perm or {list(default_perms.keys())}"])
     return commands.check(predicate)
 
-def reconstruct_dumper():
-    possible_names = ["revea.lol_dumped.lua.txt", "revea.lol_dumped.lua"]
-    dump_path = None
-    for name in possible_names:
+def check_and_reconstruct_dumper():
+    raw_file_path = None
+    
+    # 1. Look for the raw text files first
+    for name in ["revea.lol_dumped.lua.txt", "revea.lol_dumped.lua"]:
         if os.path.exists(name):
-            dump_path = name
+            raw_file_path = name
             break
             
-    if not dump_path:
-        return False, "Could not find 'revea.lol_dumped.lua.txt' in your main GitHub folder. Please make sure you have uploaded it!"
+    # 2. If no raw txt file is found, check if dumper.lua itself is actually the raw file in disguise
+    if not raw_file_path and os.path.exists("dumper.lua"):
+        try:
+            with open("dumper.lua", "r", encoding="utf-8") as f:
+                content = f.read(2048) # Read the first 2KB of the file
+                if "START_FILE:./_env_dumper_launcher.lua" in content or "CHUNK:" in content:
+                    raw_file_path = "dumper.lua"
+        except Exception:
+            pass
+
+    # If it's already a clean dumper.lua and we didn't find any raw files, we are good to go!
+    if not raw_file_path:
+        if os.path.exists("dumper.lua"):
+            return True, None
+        return False, "Could not find 'revea.lol_dumped.lua.txt' or raw 'dumper.lua' in your repository."
 
     try:
         is_target_file = False
         chunks = []
-        with open(dump_path, "r", encoding="utf-8") as f:
+        with open(raw_file_path, "r", encoding="utf-8") as f:
             for line in f:
-                # Only look for the launcher chunks
                 if "START_FILE:./_env_dumper_launcher.lua" in line:
                     is_target_file = True
                     continue
@@ -1136,21 +1149,23 @@ def reconstruct_dumper():
                     continue
                 
                 if is_target_file:
-                    # Match everything between CHUNK: and the outermost trailing quote
                     match = re.search(r'[\'"]CHUNK:(.*)[\'"]', line)
                     if match:
                         chunk_data = match.group(1)
                         try:
-                            # Decode the escape characters natively to get the true Lua format
+                            # Use codecs escape_decode to handle all escape sequences natively
                             unescaped = codecs.escape_decode(bytes(chunk_data, "utf-8"))[0].decode("utf-8")
                         except Exception:
                             unescaped = chunk_data.replace("\\n", "\n").replace("\\t", "\t").replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
                         chunks.append(unescaped)
         
         if not chunks:
-            return False, "Found the text file, but failed to extract any code chunks. Make sure the file format is intact."
+            # If we were reading dumper.lua itself and it yielded nothing, it might already be clean
+            if raw_file_path == "dumper.lua":
+                return True, None
+            return False, "Found the raw file, but failed to extract any chunks."
             
-        # Write the combined clean launcher to dumper.lua
+        # Overwrite dumper.lua with the freshly reconstructed clean code
         with open("dumper.lua", "w", encoding="utf-8") as out:
             out.write("".join(chunks))
             
@@ -2804,11 +2819,10 @@ async def tester_key_loop(ctx):
 
 @bot.command()
 async def deobf(ctx):
-    # --- 0. AUTO-UNPACK DUMPER SCRIPT IF MISSING ---
-    if not os.path.exists("dumper.lua"):
-        status, err = reconstruct_dumper()
-        if not status:
-            return await ctx.send(f"❌ Failed to reconstruct the dumper script:\n`{err}`\n\nMake sure the file `revea.lol_dumped.lua.txt` is uploaded directly to your main GitHub folder.")
+    # --- 0. AUTO-UNPACK / AUTO-FIX DUMPER SCRIPT ---
+    status, err = check_and_reconstruct_dumper()
+    if not status:
+        return await ctx.send(f"❌ Failed to reconstruct the dumper script:\n`{err}`\n\nMake sure the file `revea.lol_dumped.lua.txt` is uploaded directly to your main GitHub folder.")
 
     # --- 1. AUTO-INSTALL LUNE IF MISSING ---
     if not os.path.exists("./lune"):
@@ -2881,7 +2895,7 @@ async def deobf(ctx):
         if os.path.exists(input_filename):
             os.remove(input_filename)
         if os.path.exists(output_filename):
-            os.remove(output_filename)
+            os.remove(output_filename)        
                  
 @bot.command()
 @check_perms("givequota", administrator=True)
