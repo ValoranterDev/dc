@@ -4,12 +4,13 @@ import json
 import logging
 import sys
 import random
-import re
 import asyncio
 import aiohttp
 import wavelink
 import io
 import uuid
+import re
+import codecs
 import zipfile
 import stat
 import subprocess
