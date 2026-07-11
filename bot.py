@@ -2904,6 +2904,83 @@ async def deobf(ctx):
             os.remove(input_filename)
         if os.path.exists(output_filename):
             os.remove(output_filename)        
+@bot.hybrid_command(name="create_testkey", description="generates a custom test key (owner only)")
+@commands.is_owner()
+@app_commands.describe(duration_str="e.g. 12h, 1d, lifetime", member="user to receive the test key (optional)")
+async def create_testkey(ctx, duration_str: str, member: discord.Member = None):
+    # 1. Parse duration
+    if duration_str.lower() in ["lifetime", "permanent", "perm"]:
+        expires_at = None
+        exp_text = "lifetime"
+    else:
+        duration = parse_duration(duration_str)
+        if not duration:
+            return await ctx.send("invalid duration format. use like '12h', '1d', '30m', or 'lifetime'.", ephemeral=True)
+        expires_at = (datetime.now(timezone.utc) + duration).isoformat()
+        exp_text = duration_str
+
+    # 2. Generate Test Key (Forces SEDSE-TEST- format for intelligent routing)
+    random_part = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=8))
+    new_key = f"SEDSE-TEST-{random_part}"
+
+    # 3. Save to Supabase (HWID set to BYPASS for database clarity)
+    data = {"key_value": new_key, "is_active": True, "hwid": "BYPASS"}
+    if expires_at:
+        data["expires_at"] = expires_at
+
+    inserted = await supabase_request("POST", "keys", data)
+    if inserted is None:
+        return await ctx.send("database error: failed to create test key in supabase.", ephemeral=True)
+
+    # 4. DM the command user (you)
+    dm_success_author = False
+    try:
+        embed_author = discord.Embed(
+            title="🧪 Test Key Generated Successfully",
+            description=f"You generated a new test key.\n\n**Key:** `{new_key}`\n**Duration:** {exp_text}",
+            color=0x5aabf2
+        )
+        embed_author.set_footer(text="This key bypasses HWID locks and runs the Tester Script.")
+        await ctx.author.send(embed=embed_author)
+        dm_success_author = True
+    except discord.Forbidden:
+        pass
+
+    # 5. DM the target member (if specified)
+    dm_success_member = False
+    if member and member != ctx.author:
+        try:
+            embed_member = discord.Embed(
+                title="🧪 SEDSE Test Key",
+                description=f"An admin generated a test key for you.\n\n**Key:** `{new_key}`\n**Duration:** {exp_text}",
+                color=0x5aabf2
+            )
+            embed_member.set_footer(text="This key bypasses HWID locks and runs the experimental Tester Script.")
+            await member.send(embed_member)
+            dm_success_member = True
+        except discord.Forbidden:
+            pass
+
+    # 6. Respond in Chat (Fully ephemeral if run via Slash Command)
+    chat_msg = f"Test key generated: `{new_key}` (Duration: {exp_text})"
+    if member:
+        chat_msg += f" and sent to {member.display_name}'s DMs."
+
+    if ctx.interaction:
+        # If run via Slash Command (/create_testkey), send an ephemeral message only you can see
+        await ctx.send(chat_msg, ephemeral=True)
+    else:
+        # If run via Prefix (!sedse create_testkey), DM you and send a secure temporary status
+        status_targets = []
+        if dm_success_author:
+            status_targets.append("your DMs")
+        if member and dm_success_member:
+            status_targets.append(f"{member.display_name}'s DMs")
+        
+        if status_targets:
+            await ctx.send(f"test key successfully generated and sent to {', and '.join(status_targets)}.", delete_after=10)
+        else:
+            await ctx.send(f"test key generated but failed to send to DMs. here is the key: `{new_key}`", delete_after=15)
                  
 @bot.command()
 @check_perms("givequota", administrator=True)
