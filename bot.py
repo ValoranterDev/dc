@@ -2804,29 +2804,32 @@ async def tester_key_loop(ctx):
 
 @bot.command()
 async def deobf(ctx):
-    # --- 0. AUTO-INSTALL LUNE IF MISSING ---
+    # --- 0. AUTO-UNPACK DUMPER SCRIPT IF MISSING ---
+    if not os.path.exists("dumper.lua"):
+        status, err = reconstruct_dumper()
+        if not status:
+            return await ctx.send(f"❌ Failed to reconstruct the dumper script:\n`{err}`\n\nMake sure the file `revea.lol_dumped.lua.txt` is uploaded directly to your main GitHub folder.")
+
+    # --- 1. AUTO-INSTALL LUNE IF MISSING ---
     if not os.path.exists("./lune"):
         setup_msg = await ctx.send("⚙️ First-time setup: Downloading the Lune engine... please wait a few seconds.")
         try:
             url = "https://github.com/lune-org/lune/releases/download/v0.8.8/lune-0.8.8-linux-x86_64.zip"
-            # Download the zip file asynchronously
             async with aiohttp.ClientSession() as session:
                 async with session.get(url) as resp:
                     with open("lune.zip", "wb") as f:
                         f.write(await resp.read())
             
-            # Unzip it
             with zipfile.ZipFile("lune.zip", 'r') as zip_ref:
                 zip_ref.extractall(".")
             os.remove("lune.zip")
             
-            # Give the file executable permissions (chmod +x)
             os.chmod("./lune", os.stat("./lune").st_mode | stat.S_IEXEC)
             await setup_msg.delete()
         except Exception as e:
             return await setup_msg.edit(content=f"❌ Failed to download Lune automatically: {e}")
 
-    # --- 1. NORMAL DEOBFUSCATION LOGIC ---
+    # --- 2. DEOBFUSCATION LOGIC ---
     if not ctx.message.attachments:
         return await ctx.send("You need to attach a `.lua` or `.txt` file for me to deobfuscate!")
     
@@ -2847,7 +2850,7 @@ async def deobf(ctx):
     try:
         await attachment.save(input_filename)
 
-        # Run Lune
+        # Run Lune using the rebuilt dumper.lua
         process = await asyncio.create_subprocess_exec(
             "./lune", "run", "dumper.lua", input_filename, output_filename,
             stdout=subprocess.PIPE, 
