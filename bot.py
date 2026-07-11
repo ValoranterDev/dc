@@ -29,20 +29,26 @@ active_tester_tasks = {}
 # ==========================================
 # 0. DATABASE & CACHE SETUP
 # ==========================================
+import os
 
-HONEYPOT_FILE = "honeypots.json"
-WARNINGS_FILE = "warnings.json"
-SETTINGS_FILE = "settings.json"
-AFK_FILE = "afk.json"
-PERMS_FILE = "perms.json"
-MUTED_ADMINS_FILE = "muted_admins.json"
-UWULOCK_FILE = "uwulock.json"
-QUOTAS_FILE = "quotas.json"
-WHITELIST_FILE = "whitelist.json"
-PRIORITY_WHITELIST_FILE = "priority_whitelist.json"
-UMARIZZ_FILE = "umarizz.json"
-TESTER_KEYS_FILE = "tester_keys.json"
-SHADOW_THREADS_FILE = "shadow_threads.json"
+# Create a data directory so the bot saves files inside the Railway Volume
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
+HONEYPOT_FILE = os.path.join(DATA_DIR, "honeypots.json")
+WARNINGS_FILE = os.path.join(DATA_DIR, "warnings.json")
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
+AFK_FILE = os.path.join(DATA_DIR, "afk.json")
+PERMS_FILE = os.path.join(DATA_DIR, "perms.json")
+MUTED_ADMINS_FILE = os.path.join(DATA_DIR, "muted_admins.json")
+UWULOCK_FILE = os.path.join(DATA_DIR, "uwulock.json")
+QUOTAS_FILE = os.path.join(DATA_DIR, "quotas.json")
+WHITELIST_FILE = os.path.join(DATA_DIR, "whitelist.json")
+PRIORITY_WHITELIST_FILE = os.path.join(DATA_DIR, "priority_whitelist.json")
+UMARIZZ_FILE = os.path.join(DATA_DIR, "umarizz.json")
+TESTER_KEYS_FILE = os.path.join(DATA_DIR, "tester_keys.json")
+SHADOW_THREADS_FILE = os.path.join(DATA_DIR, "shadow_threads.json")
+HWID_COOLDOWNS_FILE = os.path.join(DATA_DIR, "hwid_cooldowns.json")
 
 # Auto-generate umarizz.json if it's missing (with the fixed syntax)
 UMARIZZ_DEFAULT_DATA = {
