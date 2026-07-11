@@ -1111,6 +1111,53 @@ def check_perms(cmd_name, **default_perms):
         raise commands.MissingPermissions([f"custom role/user perm or {list(default_perms.keys())}"])
     return commands.check(predicate)
 
+def reconstruct_dumper():
+    possible_names = ["revea.lol_dumped.lua.txt", "revea.lol_dumped.lua"]
+    dump_path = None
+    for name in possible_names:
+        if os.path.exists(name):
+            dump_path = name
+            break
+            
+    if not dump_path:
+        return False, "Could not find 'revea.lol_dumped.lua.txt' in your main GitHub folder. Please make sure you have uploaded it!"
+
+    try:
+        is_target_file = False
+        chunks = []
+        with open(dump_path, "r", encoding="utf-8") as f:
+            for line in f:
+                # Only look for the launcher chunks
+                if "START_FILE:./_env_dumper_launcher.lua" in line:
+                    is_target_file = True
+                    continue
+                if "END_FILE:./_env_dumper_launcher.lua" in line:
+                    is_target_file = False
+                    continue
+                
+                if is_target_file:
+                    # Match everything between CHUNK: and the outermost trailing quote
+                    match = re.search(r'[\'"]CHUNK:(.*)[\'"]', line)
+                    if match:
+                        chunk_data = match.group(1)
+                        try:
+                            # Decode the escape characters natively to get the true Lua format
+                            unescaped = codecs.escape_decode(bytes(chunk_data, "utf-8"))[0].decode("utf-8")
+                        except Exception:
+                            unescaped = chunk_data.replace("\\n", "\n").replace("\\t", "\t").replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
+                        chunks.append(unescaped)
+        
+        if not chunks:
+            return False, "Found the text file, but failed to extract any code chunks. Make sure the file format is intact."
+            
+        # Write the combined clean launcher to dumper.lua
+        with open("dumper.lua", "w", encoding="utf-8") as out:
+            out.write("".join(chunks))
+            
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
 async def check_and_increment_quota(ctx, command_name):
     if await is_mod_owner(ctx): return True # Owners/Mods bypass quotas
     
