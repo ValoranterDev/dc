@@ -1127,8 +1127,8 @@ def check_and_reconstruct_dumper():
             except Exception:
                 pass
 
-    # If a clean unpacked dumper.lua already exists and we didn't find any raw files, we are good!
     if not raw_file_path:
+        # If a clean unpacked dumper.lua already exists and we didn't find any raw files, we are good!
         if os.path.exists("dumper.lua"):
             return True, None
         return False, "Could not find 'revea.lol_dumped.lua.txt' or raw 'dumper.lua' in your repository."
@@ -1138,24 +1138,27 @@ def check_and_reconstruct_dumper():
         chunks = []
         with open(raw_file_path, "r", encoding="utf-8") as f:
             for line in f:
-                stripped = line.strip()
-                
+                # Do not strip the raw line yet so indices match perfectly
                 # Check for file boundaries to isolate _env_dumper_launcher.lua
-                if "START_FILE:./_env_dumper_launcher.lua" in stripped:
+                if "START_FILE:./_env_dumper_launcher.lua" in line:
                     is_target_file = True
                     chunks = [] # Reset chunks to avoid any pollution
                     continue
-                if "END_FILE:./_env_dumper_launcher.lua" in stripped:
+                if "END_FILE:./_env_dumper_launcher.lua" in line:
                     is_target_file = False
                     continue
                 
-                if is_target_file and "CHUNK:" in stripped:
+                if is_target_file and "CHUNK:" in line:
                     # Find where CHUNK: starts
-                    idx = stripped.find("CHUNK:")
+                    idx = line.find("CHUNK:")
+                    # The quote character used is right before CHUNK: (' or ")
+                    quote_char = line[idx - 1]
                     # The content starts right after CHUNK:
                     content_start = idx + 6
-                    # The content ends right before the trailing quote character (the last char of the line)
-                    chunk_data = stripped[content_start:-1]
+                    # Find the ending quote character from the right
+                    content_end = line.rfind(quote_char)
+                    
+                    chunk_data = line[content_start:content_end]
                     
                     try:
                         # Decode escape sequences natively
