@@ -9,6 +9,8 @@ import asyncio
 import aiohttp
 import wavelink
 import io
+import uuid
+import subprocess
 from gtts import gTTS
 from datetime import timedelta, datetime, timezone
 
@@ -2750,6 +2752,72 @@ async def tester_key_loop(ctx):
             print(f"tester key loop error: {e}")
             await asyncio.sleep(10) # Safely retry after 10s if database rate-limits
 
+@bot.command()
+async def deobf(ctx):
+    # 1. Check if the user attached a file
+    if not ctx.message.attachments:
+        return await ctx.send("You need to attach a `.lua` or `.txt` file for me to deobfuscate!")
+    
+    attachment = ctx.message.attachments[0]
+    
+    # 2. Check the file extension and size (Prevent people from crashing your bot with huge files)
+    if not attachment.filename.endswith((".lua", ".txt")):
+        return await ctx.send("Please attach a valid `.lua` or `.txt` file.")
+    
+    if attachment.size > 2 * 1024 * 1024: # 2 MB limit
+        return await ctx.send("File is too large! Please keep it under 2MB.")
+
+    msg = await ctx.send("📥 Downloading and analyzing the script... this might take a minute or two depending on the obfuscation.")
+
+    # 3. Create unique file names so multiple people can use it at the same time safely
+    file_id = str(uuid.uuid4())
+    input_filename = os.path.join(DATA_DIR, f"input_{file_id}.lua")
+    output_filename = os.path.join(DATA_DIR, f"output_{file_id}.lua")
+
+    try:
+        # Save the attached file to the Railway server
+        await attachment.save(input_filename)
+
+        # 4. Run the Lua dumper script using Lune via command line
+        # The command is: ./lune run dumper.lua <input_file> <output_file>
+        process = await asyncio.create_subprocess_exec(
+            "./lune", "run", "revea.lol_dumped.lua.txt", input_filename, output_filename,
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE
+        )
+
+        # 5. Wait for it to finish, with a strict 45-second timeout (obfuscated scripts can get stuck in infinite loops)
+        try:
+            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=45.0)
+        except asyncio.TimeoutError:
+            process.kill() # Kill the process if it takes too long
+            return await msg.edit(content="❌ Deobfuscation timed out! The script might be malicious, broken, or too heavily obfuscated.")
+
+        # 6. Check if the output file was created successfully
+        if os.path.exists(output_filename) and os.path.getsize(output_filename) > 0:
+            
+            # Check if the output is too big for Discord (Discord limit is usually 25MB)
+            if os.path.getsize(output_filename) > 24 * 1024 * 1024:
+                await msg.edit(content="⚠️ Deobfuscation finished, but the output file is too massive for Discord!")
+            else:
+                await msg.edit(content="✅ **Deobfuscation Complete!** Here is your dumped script:")
+                await ctx.send(file=discord.File(output_filename, filename=f"deobf_{attachment.filename}"))
+                
+        else:
+            # If it failed, show the error log
+            error_msg = stderr.decode()[:800] # Grab first 800 chars of error
+            await msg.edit(content=f"❌ Deobfuscation failed to produce an output.\n**Error Log:**\n```\n{error_msg}\n```")
+
+    except Exception as e:
+        await msg.edit(content=f"❌ An internal bot error occurred: {e}")
+
+    finally:
+        # 7. ALWAYS clean up the files so your Railway server doesn't run out of storage space
+        if os.path.exists(input_filename):
+            os.remove(input_filename)
+        if os.path.exists(output_filename):
+            os.remove(output_filename)
+                 
 @bot.command()
 @check_perms("givequota", administrator=True)
 async def givequota(ctx, member: discord.Member, command_name: str, amount: int = 5):
