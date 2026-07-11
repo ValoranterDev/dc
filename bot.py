@@ -1115,63 +1115,69 @@ def check_and_reconstruct_dumper():
     raw_file_path = None
     
     # 1. Look for the raw text files first
-    for name in ["revea.lol_dumped.lua.txt", "revea.lol_dumped.lua"]:
+    for name in ["revea.lol_dumped.lua.txt", "revea.lol_dumped.lua", "dumper.lua"]:
         if os.path.exists(name):
-            raw_file_path = name
-            break
-            
-    # 2. If no raw txt file is found, check if dumper.lua itself is actually the raw file in disguise
-    if not raw_file_path and os.path.exists("dumper.lua"):
-        try:
-            with open("dumper.lua", "r", encoding="utf-8") as f:
-                content = f.read(2048) # Read the first 2KB of the file
-                if "START_FILE:./_env_dumper_launcher.lua" in content or "CHUNK:" in content:
-                    raw_file_path = "dumper.lua"
-        except Exception:
-            pass
+            try:
+                with open(name, "r", encoding="utf-8") as f:
+                    header = f.read(4096)
+                    if "START_FILE:./_env_dumper_launcher.lua" in header or "CHUNK:" in header:
+                        raw_file_path = name
+                        break
+            except Exception:
+                pass
 
-    # If it's already a clean dumper.lua and we didn't find any raw files, we are good to go!
+    # If a clean unpacked dumper.lua already exists and we didn't find any raw files to unpack, we are good!
     if not raw_file_path:
         if os.path.exists("dumper.lua"):
             return True, None
         return False, "Could not find 'revea.lol_dumped.lua.txt' or raw 'dumper.lua' in your repository."
 
     try:
-        is_target_file = False
-        chunks = []
+        # Read the entire file as a single block of text
         with open(raw_file_path, "r", encoding="utf-8") as f:
-            for line in f:
-                if "START_FILE:./_env_dumper_launcher.lua" in line:
-                    is_target_file = True
-                    continue
-                if "END_FILE:./_env_dumper_launcher.lua" in line:
-                    is_target_file = False
-                    continue
-                
-                if is_target_file:
-                    match = re.search(r'[\'"]CHUNK:(.*)[\'"]', line)
-                    if match:
-                        chunk_data = match.group(1)
-                        try:
-                            # Use codecs escape_decode to handle all escape sequences natively
-                            unescaped = codecs.escape_decode(bytes(chunk_data, "utf-8"))[0].decode("utf-8")
-                        except Exception:
-                            unescaped = chunk_data.replace("\\n", "\n").replace("\\t", "\t").replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
-                        chunks.append(unescaped)
+            full_content = f.read()
+
+        # Isolate the _env_dumper_launcher.lua section
+        start_marker = "START_FILE:./_env_dumper_launcher.lua"
+        end_marker = "END_FILE:./_env_dumper_launcher.lua"
         
-        if not chunks:
-            # If we were reading dumper.lua itself and it yielded nothing, it might already be clean
+        start_idx = full_content.find(start_marker)
+        end_idx = full_content.find(end_marker)
+        
+        if start_idx == -1 or end_idx == -1:
+            # Fallback: if the markers are missing, try parsing the whole file
+            target_content = full_content
+        else:
+            target_content = full_content[start_idx + len(start_marker):end_idx]
+
+        # Use re.DOTALL to find print('CHUNK:...') statements even if they span multiple lines
+        matches = re.findall(r'print\(\s*[\'"]CHUNK:(.*?)[\'"]\s*\)', target_content, re.DOTALL)
+        
+        if not matches:
+            # If we were looking at dumper.lua itself and it's already clean (no CHUNK matches), return True
             if raw_file_path == "dumper.lua":
                 return True, None
-            return False, "Found the raw file, but failed to extract any chunks."
-            
+            return False, f"Located the file at '{raw_file_path}', but failed to extract code chunks."
+
+        chunks = []
+        for chunk_data in matches:
+            try:
+                # Natively decode the string escapes (\n, \t, etc.)
+                unescaped = codecs.escape_decode(bytes(chunk_data, "utf-8"))[0].decode("utf-8")
+            except Exception:
+                # Fallback replacements
+                unescaped = chunk_data.replace("\\n", "\n").replace("\\t", "\t").replace('\\"', '"').replace("\\'", "'").replace("\\\\", "\\")
+            chunks.append(unescaped)
+
+        clean_code = "".join(chunks)
+        
         # Overwrite dumper.lua with the freshly reconstructed clean code
         with open("dumper.lua", "w", encoding="utf-8") as out:
-            out.write("".join(chunks))
+            out.write(clean_code)
             
         return True, None
     except Exception as e:
-        return False, str(e)
+        return False, f"Error during reconstruction: {e}"
 
 async def check_and_increment_quota(ctx, command_name):
     if await is_mod_owner(ctx): return True # Owners/Mods bypass quotas
