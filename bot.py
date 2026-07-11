@@ -2709,22 +2709,12 @@ async def tester_key_loop(ctx):
             }
             await supabase_request("POST", "keys", data)
             
-            # 4. Compile the full, ultra-stable hybrid HWID loader
+            # 4. Compile the completely clean loader
             loader_code = (
                 f"local key = \"{current_key}\"\n"
-                f"local hwid = \"Unknown\"\n"
-                f"pcall(function()\n"
-                f"    if gethwid then\n"
-                f"        hwid = gethwid()\n"
-                f"    else\n"
-                f"        hwid = game:GetService(\"RbxAnalyticsService\"):GetClientId()\n"
-                f"    end\n"
-                f"end)\n"
                 f"(loadstring or load)(game:HttpGet(\"https://keyxyz-sedse.pages.dev/v1/load?key=\" .. "
-                f"game:GetService(\"HttpService\"):UrlEncode(key) .. \"&hwid=\" .. "
-                f"game:GetService(\"HttpService\"):UrlEncode(hwid) .. \"&_cb=\" .. "
-                f"tostring(os.clock()), true))()"
-)
+                f"game:GetService(\"HttpService\"):UrlEncode(key), true))()"
+            )
             
             # 5. Construct the Neubrutalist Embed Menu
             embed = discord.Embed(
