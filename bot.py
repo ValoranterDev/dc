@@ -2956,7 +2956,7 @@ async def create_testkey(ctx, duration_str: str, member: discord.Member = None):
                 color=0x5aabf2
             )
             embed_member.set_footer(text="This key bypasses HWID locks and runs the experimental Tester Script.")
-            await member.send(embed_member)
+            await member.send(embed=embed_member)
             dm_success_member = True
         except discord.Forbidden:
             pass
