@@ -54,6 +54,8 @@ UMARIZZ_FILE = os.path.join(DATA_DIR, "umarizz.json")
 TESTER_KEYS_FILE = os.path.join(DATA_DIR, "tester_keys.json")
 SHADOW_THREADS_FILE = os.path.join(DATA_DIR, "shadow_threads.json")
 HWID_COOLDOWNS_FILE = os.path.join(DATA_DIR, "hwid_cooldowns.json")
+XP_FILE = os.path.join(DATA_DIR, "xp_tokens.json")
+INVITES_FILE = os.path.join(DATA_DIR, "invites.json")
 
 # Auto-generate umarizz.json if it's missing (with the fixed syntax)
 UMARIZZ_DEFAULT_DATA = {
@@ -256,6 +258,68 @@ class JJSView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         self.add_item(JJSDropdown())
+class KeyPurchaseSelect(discord.ui.Select):
+    def __init__(self):
+        options = [
+            discord.SelectOption(label="1 Day Key", description="Cost: 15 Tokens", value="1d"),
+            discord.SelectOption(label="1 Week Key", description="Cost: 100 Tokens", value="1w"),
+            discord.SelectOption(label="1 Month Key", description="Cost: 400 Tokens", value="1m"),
+            discord.SelectOption(label="Lifetime Key", description="Cost: 1500 Tokens", value="lifetime"),
+        ]
+        super().__init__(placeholder="Select a key duration to purchase...", min_values=1, max_values=1, options=options)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        
+        prices = {"1d": 15, "1w": 100, "1m": 400, "lifetime": 1500}
+        durations = {"1d": timedelta(days=1), "1w": timedelta(days=7), "1m": timedelta(days=30), "lifetime": None}
+        
+        val = self.values[0]
+        cost = prices[val]
+        
+        uid = str(interaction.user.id)
+        xp_data = load_json(XP_FILE, dict)
+        user_tokens = xp_data.get(uid, {}).get("tokens", 0)
+        
+        if user_tokens < cost:
+            return await interaction.followup.send(f"❌ You don't have enough tokens! You need **{cost} tokens**, but you only have **{user_tokens}**.", ephemeral=True)
+        
+        # Deduct tokens
+        xp_data[uid]["tokens"] -= cost
+        save_json(XP_FILE, xp_data)
+        
+        # Generate key
+        random_part = "".join(random.choices("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=8))
+        new_key = f"SEDSE-{random_part}"
+        
+        data = {"key_value": new_key, "is_active": True}
+        if val != "lifetime":
+            expires_at = (datetime.now(timezone.utc) + durations[val]).isoformat()
+            data["expires_at"] = expires_at
+            
+        inserted = await supabase_request("POST", "keys", data)
+        if inserted is None:
+            # Refund if database fails
+            xp_data[uid]["tokens"] += cost
+            save_json(XP_FILE, xp_data)
+            return await interaction.followup.send("❌ Database error: failed to create key in supabase. Tokens refunded.", ephemeral=True)
+            
+        embed = discord.Embed(
+            title="🔑 Key Purchased Successfully",
+            description=f"You bought a **{val}** key for {cost} tokens.\n\n**Key:** `{new_key}`",
+            color=0x5aabf2
+        )
+        embed.set_footer(text="Keep this key safe! It is bound to you.")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+        try:
+            await interaction.user.send(embed=embed)
+        except discord.Forbidden:
+            pass
+
+class KeyPurchaseView(discord.ui.View):
+    def __init__(self):
+        super().__init__(timeout=120)
+        self.add_item(KeyPurchaseSelect())
 
 class HoneypotView(discord.ui.View):
     def __init__(self):
@@ -1007,9 +1071,9 @@ class MyBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True 
         intents.members = True 
+        intents.invites = True  # <-- ADDED FOR INVITE REWARDS
         super().__init__(command_prefix=["!sedse ", "!"], intents=intents)
         self.honeypot_channels = load_honeypots()
-
     async def setup_hook(self):
         self.add_view(JJSView())
         self.add_view(VerifyView())
