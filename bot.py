@@ -245,21 +245,16 @@ class JJSDropdown(discord.ui.Select):
 
     async def callback(self, interaction: discord.Interaction):
     if self.values[0] == "sedse_jjs":
-        # Triple quotes prevent Python from getting confused by the single and double quotes inside
-        response_text = """here's the sedse jjs script:
-`loadstring(game:HttpGet("https://raw.githubusercontent.com/SedseXD/sedsejjs/refs/heads/main/sedse's%20scripts.lua"))()`"""
-        
+        response_text = "here's the sedse jjs script:\n`loadstring(game:HttpGet(\"https://raw.githubusercontent.com/SedseXD/sedsejjs/refs/heads/main/sedse's%20scripts.lua\"))()`"
     elif self.values[0] == "jjs_piano":
         response_text = "here's the info and link for jjs piano:\n `loadstring(game:HttpGet('https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua'))()`"
-        
     elif self.values[0] == "jjs_piano_os":
         response_text = "here's the github link and info for jjs piano open source: https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua"
-        
     else:
-        # Fallback to prevent UnboundLocalError if none of the options match
         response_text = "Invalid selection."
 
     await interaction.response.send_message(response_text, ephemeral=True)
+
 
 
 class JJSView(discord.ui.View):
