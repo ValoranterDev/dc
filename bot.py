@@ -244,13 +244,16 @@ class JJSDropdown(discord.ui.Select):
         super().__init__(placeholder="choose a script...", min_values=1, max_values=1, options=options, custom_id="persistent_jjs_dropdown")
 
     async def callback(self, interaction: discord.Interaction):
-    if self.values[0] == "sedse_jjs":
-        response_text = "here's the sedse jjs script:\n`loadstring(game:HttpGet(\"https://raw.githubusercontent.com/SedseXD/sedsejjs/refs/heads/main/sedse's%20scripts.lua\"))()`"
-    elif self.values[0] == "jjs_piano":
-        response_text = "here's the info and link for jjs piano:\n `loadstring(game:HttpGet('https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua'))()`"
-    elif self.values[0] == "jjs_piano_os":
-        response_text = "here's the github link and info for jjs piano open source: https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua"
-    await interaction.response.send_message(response_text, ephemeral=True)
+        if self.values[0] == "sedse_jjs":
+            response_text = "here's the sedse jjs script:\n`loadstring(game:HttpGet(\"https://raw.githubusercontent.com/SedseXD/sedsejjs/refs/heads/main/sedse's%20scripts.lua\"))()`"
+        elif self.values[0] == "jjs_piano":
+            response_text = "here's the info and link for jjs piano:\n `loadstring(game:HttpGet('https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua'))()`"
+        elif self.values[0] == "jjs_piano_os":
+            response_text = "here's the github link and info for jjs piano open source: https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua"
+        else:
+            response_text = "Invalid selection."
+
+        await interaction.response.send_message(response_text, ephemeral=True)
 
 
 
