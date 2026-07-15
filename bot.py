@@ -246,10 +246,10 @@ class JJSDropdown(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         if self.values[0] == "sedse_jjs":
             response_text = """here's the sedse jjs script:
-```lua
+`python
 local key = "KEY_HERE"
 (loadstring or load)(game:HttpGet("[https://keyxyz-sedse.pages.dev/v1/load?key=](https://keyxyz-sedse.pages.dev/v1/load?key=)" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock()), true))()
-```"""
+`"""
         elif self.values[0] == "jjs_piano":
             response_text = "here's the info and link for jjs piano:\n`loadstring(game:HttpGet('https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua'))()`"
         elif self.values[0] == "jjs_piano_os":
