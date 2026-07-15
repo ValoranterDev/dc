@@ -244,16 +244,18 @@ class JJSDropdown(discord.ui.Select):
         super().__init__(placeholder="choose a script...", min_values=1, max_values=1, options=options, custom_id="persistent_jjs_dropdown")
 
     async def callback(self, interaction: discord.Interaction):
-    if self.values[0] == "sedse_jjs":
-        response_text = """here's the sedse jjs script:\n`pythonlocal key = "KEY_HERE"\n(loadstring or load)(game:HttpGet("https://keyxyz-sedse.pages.dev/v1/load?key=" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock()), true))()`"""
-    elif self.values[0] == "jjs_piano":
-        response_text = "here's the info and link for jjs piano:\n `loadstring(game:HttpGet('[https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua](https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua)'))()`"
-    elif self.values[0] == "jjs_piano_os":
-        response_text = "here's the github link and info for jjs piano open source: [https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua](https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua)"
-        
-    await interaction.response.send_message(response_text, ephemeral=True)
-
-
+        if self.values[0] == "sedse_jjs":
+            response_text = """here's the sedse jjs script:
+```lua
+local key = "KEY_HERE"
+(loadstring or load)(game:HttpGet("[https://keyxyz-sedse.pages.dev/v1/load?key=](https://keyxyz-sedse.pages.dev/v1/load?key=)" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock()), true))()
+```"""
+        elif self.values[0] == "jjs_piano":
+            response_text = "here's the info and link for jjs piano:\n`loadstring(game:HttpGet('https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua'))()`"
+        elif self.values[0] == "jjs_piano_os":
+            response_text = "here's the github link and info for jjs piano open source:\nhttps://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua"
+            
+        await interaction.response.send_message(response_text, ephemeral=True)
 
 
 
