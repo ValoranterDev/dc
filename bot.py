@@ -248,7 +248,7 @@ class JJSDropdown(discord.ui.Select):
             response_text = """here's the sedse jjs script:
 `
 local key = "KEY_HERE"
-(loadstring or load)(game:HttpGet("[https://keyxyz-sedse.pages.dev/v1/load?key=](https://keyxyz-sedse.pages.dev/v1/load?key=)" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock()), true))()
+loadstring(game:HttpGet("https://keyxyz-sedse.pages.dev/v1/load?key=" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock())))()
 `"""
         elif self.values[0] == "jjs_piano":
             response_text = "here's the info and link for jjs piano:\n`loadstring(game:HttpGet('https://raw.githubusercontent.com/SedseXD/piano/refs/heads/main/pianoscript.lua'))()`"
@@ -704,8 +704,8 @@ class KeySystemView(discord.ui.View):
                 break
                 
         if valid_key:
-            loader = f'local key = "{valid_key}"\n(loadstring or load)(game:HttpGet("https://keyxyz-sedse.pages.dev/v1/load?key=" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock()), true))()'
-            await interaction.followup.send(f"**your loader script:**\n```lua\n{loader}\n```", ephemeral=True)
+            loader = f'local key = "{valid_key}"\nloadstring(game:HttpGet("https://keyxyz-sedse.pages.dev/v1/load?key=" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock())))()'
+            await interaction.followup.send(f"**your loader script:**\n`\n{loader}\n`", ephemeral=True)
         else:
             await interaction.followup.send("all your redeemed keys have expired. please generate a new one.", ephemeral=True)
 
@@ -1438,7 +1438,7 @@ async def tester_key_loop(channel):
             await supabase_request("POST", "keys", data)
             
             # 4. Construct the loadstring snippet for easy copying
-            lua_loader = f'```lua\nlocal key = "{current_key}"\n(loadstring or load)(game:HttpGet("https://keyxyz-sedse.pages.dev/v1/load?key=" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock()), true))()\n```'
+            lua_loader = f'```lua\nlocal key = "{current_key}"\nloadstring(game:HttpGet("https://keyxyz-sedse.pages.dev/v1/load?key=" .. game:GetService("HttpService"):UrlEncode(key) .. "&_cb=" .. tostring(os.clock())))()\n```'
             
             # 5. Construct the Neubrutalist Embed Menu
             embed = discord.Embed(
@@ -2800,8 +2800,8 @@ async def tester_key_loop(ctx):
             # 4. Compile the completely clean loader
             loader_code = (
                 f"local key = \"{current_key}\"\n"
-                f"(loadstring or load)(game:HttpGet(\"https://keyxyz-sedse.pages.dev/v1/load?key=\" .. "
-                f"game:GetService(\"HttpService\"):UrlEncode(key), true))()"
+                f"loadstring(game:HttpGet(\"https://keyxyz-sedse.pages.dev/v1/load?key=\" .. "
+                f"game:GetService(\"HttpService\"):UrlEncode(key)))()"
             )
             
             # 5. Construct the Neubrutalist Embed Menu
