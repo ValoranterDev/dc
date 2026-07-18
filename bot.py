@@ -2996,6 +2996,7 @@ async def tzuquote(ctx, *, sentence: str = None):
     if not sentence:
         return await ctx.send("you gotta give me a quote. try `!sedse tzuquote I never said this.`")
 
+    # The files we told Railway/GitHub to look for
     template_path = "suntzu_template.jpg"
     font_path = "roboto.ttf"
 
@@ -3007,107 +3008,56 @@ async def tzuquote(ctx, *, sentence: str = None):
     msg = await ctx.send("generating wisdom...")
 
     try:
+        # 1. Open the image and set up drawing
         img = Image.open(template_path).convert("RGB")
         draw = ImageDraw.Draw(img)
+
+        # 2. Load fonts (Sizes: 55 for main text, 35 for byline)
+        quote_font = ImageFont.truetype(font_path, 55)
+        byline_font = ImageFont.truetype(font_path, 35)
+
+        # 3. Format the text
+        wrapped_text = textwrap.fill(f'"{sentence}"', width=26)
+        byline = "– Sun Tzu, The Art of War"
+
+        # Image dimensions
         img_w, img_h = img.size
 
-        # --- STRICT BOUNDARIES ---
-        # 1. Force text to start exactly 8% from the left edge.
-        safe_x = int(img_w * 0.08)
-        # 2. Maximum width is exactly 42% of the image (forces it to stay away from the statue).
-        safe_max_width = int(img_w * 0.42) 
-        # 3. Maximum height allowed for the entire text block.
-        safe_max_height = int(img_h * 0.75) 
-
-        # --- DYNAMIC FONT SIZING ---
-        # Start with a reasonably large size based on the image's height
-        max_font_size = int(img_h * 0.12) 
-        min_font_size = 15
-        font_size = max_font_size
-
-        byline_text = "– Sun Tzu, The Art of War"
-        formatted_quote = ""
-        quote_font = None
-        byline_font = None
-        total_height = 0
-        quote_h = 0
-
-        # Loop to shrink the font until it fits perfectly inside the safe box bounds
-        while font_size >= min_font_size:
-            quote_font = ImageFont.truetype(font_path, font_size)
-            byline_font = ImageFont.truetype(font_path, int(font_size * 0.55)) # Byline scales with quote
-
-            # Word wrapping by PIXEL width, not character count
-            lines = []
-            words = f'"{sentence}"'.split()
-            current_line = ""
-            
-            # Check if a single huge word is too wide for the box
-            longest_word_width = max([draw.textlength(w, font=quote_font) for w in words] + [0])
-            if longest_word_width > safe_max_width:
-                font_size -= 2
-                continue # Shrink font and try again
-
-            # Pack words into lines
-            for word in words:
-                test_line = current_line + " " + word if current_line else word
-                if draw.textlength(test_line, font=quote_font) <= safe_max_width:
-                    current_line = test_line
-                else:
-                    lines.append(current_line)
-                    current_line = word
-            if current_line:
-                lines.append(current_line)
-            
-            formatted_quote = "\n".join(lines)
-
-            # Measure resulting text block height
-            quote_bbox = draw.multiline_textbbox((0, 0), formatted_quote, font=quote_font)
-            quote_h = quote_bbox[3] - quote_bbox[1]
-            
-            byline_bbox = draw.textbbox((0, 0), byline_text, font=byline_font)
-            byline_h = byline_bbox[3] - byline_bbox[1]
-            
-            # Total height = quote height + gap + byline height
-            gap = int(font_size * 0.8)
-            total_height = quote_h + gap + byline_h
-
-            if total_height <= safe_max_height:
-                break # It fits perfectly, break the loop!
-            
-            font_size -= 2 # Doesn't fit? Shrink and loop again
-
-        # --- DRAWING ---
-        # Center the entire text block vertically
-        start_y = (img_h - total_height) // 2
-
-        # Draw the quote
-        draw.multiline_text((safe_x, start_y), formatted_quote, font=quote_font, fill="white", align="left")
-
-        # Calculate where to put the byline (aligned right beneath the quote)
-        quote_bbox = draw.multiline_textbbox((0,0), formatted_quote, font=quote_font)
+        # 4. Calculate text size perfectly to center it on the left side
+        quote_bbox = draw.multiline_textbbox((0, 0), wrapped_text, font=quote_font)
         quote_w = quote_bbox[2] - quote_bbox[0]
-        byline_w = draw.textlength(byline_text, font=byline_font)
-        
-        byline_x = safe_x + quote_w - byline_w
-        # If the quote is short, clamp the byline so it doesn't go off the left side
-        if byline_x < safe_x + 20:
-            byline_x = safe_x + 20
-            
-        byline_y = start_y + quote_h + int(font_size * 0.8)
-        draw.text((byline_x, byline_y), byline_text, font=byline_font, fill="white")
+        quote_h = quote_bbox[3] - quote_bbox[1]
 
-        # --- SAVE AND SEND ---
+        byline_bbox = draw.textbbox((0, 0), byline, font=byline_font)
+        byline_w = byline_bbox[2] - byline_bbox[0]
+
+        # 5. Positioning (Anchored to the left padding, centered vertically)
+        start_x = 80 # Padding from left edge
+        start_y = (img_h - (quote_h + 40 + byline_bbox[3] - byline_bbox[1])) // 2
+
+        # Draw Quote (Left aligned)
+        draw.multiline_text((start_x, start_y), wrapped_text, font=quote_font, fill="white", align="left")
+
+        # Draw Byline (Aligned slightly to the right of the quote text block)
+        byline_x = start_x + quote_w - byline_w
+        if byline_x < start_x + 50: # Prevent byline from going too far left if the quote is short
+            byline_x = start_x + 50
+            
+        byline_y = start_y + quote_h + 30
+        draw.text((byline_x, byline_y), byline, font=byline_font, fill="white")
+
+        # 6. Save to a memory buffer instead of disk
         buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=95)
+        img.save(buffer, format="JPEG")
         buffer.seek(0)
 
+        # Send it and clean up the 'loading' message
         await msg.delete()
         await ctx.send(file=discord.File(fp=buffer, filename="tzuquote.jpg"))
 
     except Exception as e:
         await msg.edit(content=f"an error occurred while generating: {e}")
-
+                 
 @bot.command()
 @check_perms("givequota", administrator=True)
 async def givequota(ctx, member: discord.Member, command_name: str, amount: int = 5):
