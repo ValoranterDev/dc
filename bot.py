@@ -14,6 +14,8 @@ import codecs
 import zipfile
 import stat
 import subprocess
+from PIL import Image, ImageDraw, ImageFont
+import textwrap
 from gtts import gTTS
 from datetime import timedelta, datetime, timezone
 
@@ -2988,6 +2990,73 @@ async def create_testkey(ctx, duration_str: str, member: discord.Member = None):
             await ctx.send(f"test key successfully generated and sent to {', and '.join(status_targets)}.", delete_after=10)
         else:
             await ctx.send(f"test key generated but failed to send to DMs. here is the key: `{new_key}`", delete_after=15)
+
+@bot.command()
+async def tzuquote(ctx, *, sentence: str = None):
+    if not sentence:
+        return await ctx.send("you gotta give me a quote. try `!sedse tzuquote I never said this.`")
+
+    # The files we told Railway/GitHub to look for
+    template_path = "suntzu_template.jpg"
+    font_path = "roboto.ttf"
+
+    if not os.path.exists(template_path):
+        return await ctx.send("❌ template image (`suntzu_template.jpg`) is missing from the files! Upload it to GitHub.")
+    if not os.path.exists(font_path):
+        return await ctx.send("❌ font file (`roboto.ttf`) is missing from the files! Upload it to GitHub.")
+
+    msg = await ctx.send("generating wisdom...")
+
+    try:
+        # 1. Open the image and set up drawing
+        img = Image.open(template_path).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        # 2. Load fonts (Sizes: 55 for main text, 35 for byline)
+        quote_font = ImageFont.truetype(font_path, 55)
+        byline_font = ImageFont.truetype(font_path, 35)
+
+        # 3. Format the text
+        wrapped_text = textwrap.fill(f'"{sentence}"', width=26)
+        byline = "– Sun Tzu, The Art of War"
+
+        # Image dimensions
+        img_w, img_h = img.size
+
+        # 4. Calculate text size perfectly to center it on the left side
+        quote_bbox = draw.multiline_textbbox((0, 0), wrapped_text, font=quote_font)
+        quote_w = quote_bbox[2] - quote_bbox[0]
+        quote_h = quote_bbox[3] - quote_bbox[1]
+
+        byline_bbox = draw.textbbox((0, 0), byline, font=byline_font)
+        byline_w = byline_bbox[2] - byline_bbox[0]
+
+        # 5. Positioning (Anchored to the left padding, centered vertically)
+        start_x = 80 # Padding from left edge
+        start_y = (img_h - (quote_h + 40 + byline_bbox[3] - byline_bbox[1])) // 2
+
+        # Draw Quote (Left aligned)
+        draw.multiline_text((start_x, start_y), wrapped_text, font=quote_font, fill="white", align="left")
+
+        # Draw Byline (Aligned slightly to the right of the quote text block)
+        byline_x = start_x + quote_w - byline_w
+        if byline_x < start_x + 50: # Prevent byline from going too far left if the quote is short
+            byline_x = start_x + 50
+            
+        byline_y = start_y + quote_h + 30
+        draw.text((byline_x, byline_y), byline, font=byline_font, fill="white")
+
+        # 6. Save to a memory buffer instead of disk
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG")
+        buffer.seek(0)
+
+        # Send it and clean up the 'loading' message
+        await msg.delete()
+        await ctx.send(file=discord.File(fp=buffer, filename="tzuquote.jpg"))
+
+    except Exception as e:
+        await msg.edit(content=f"an error occurred while generating: {e}")
                  
 @bot.command()
 @check_perms("givequota", administrator=True)
